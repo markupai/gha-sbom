@@ -1,0 +1,4 @@
+self-hosted-runner:
+  # ARC scale sets from markupai/github-runners, labelled markupai-{env}-{region}-{arch}
+  labels:
+    - markupai-*

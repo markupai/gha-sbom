@@ -12,9 +12,11 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Self-hosted runners (markupai-runners group) wherever possible. Windows has
+# no self-hosted runner, so that self-test leg stays on GitHub-hosted.
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: markupai-dev-us1-arm64
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -36,19 +38,26 @@ jobs:
           fi
 
   actionlint:
-    runs-on: ubuntu-latest
+    runs-on: markupai-dev-us1-arm64
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The runner image has no Go toolchain.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+          cache: false
       - run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
 
-  # Runs the actions from this checkout the way callers use them. Windows is
-  # included because the .NET release jobs run there.
+  # Runs the actions from this checkout the way callers use them, on both
+  # self-hosted architectures (syft download differs) and on Windows because
+  # the .NET release jobs run there.
   self-test:
     needs: check
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        runner: [markupai-dev-us1-amd64, markupai-dev-us1-arm64, windows-latest]
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       id-token: write
@@ -81,7 +90,7 @@ jobs:
           [[ "$KEY" == gha-sbom/self-test/ci-* ]]
 
       - name: Publish (attest only, no S3 or release)
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.runner == 'markupai-dev-us1-amd64'
         uses: ./publish
         with:
           cdx: ${{ steps.stamp.outputs.cdx }}
