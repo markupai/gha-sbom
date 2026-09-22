@@ -1,0 +1,66 @@
+name: gha-sbom stamp
+description: >
+  Checks a CycloneDX SBOM isn't empty, stamps it with product, component,
+  version, commit and digest, and writes an SPDX 2.3 copy.
+inputs:
+  sbom:
+    description: Path to the CycloneDX JSON SBOM from the generator.
+    required: true
+  kind:
+    description: "`source` (from the ecosystem tool) or `image` (from syft on the image)."
+    required: true
+  product:
+    description: Product the component ships in, e.g. helios, sls, integrations.
+    required: true
+  component:
+    description: Component name, e.g. helios-one, sidebar-app, vscode-extension.
+    required: true
+  version:
+    description: Release version or tag. Becomes part of the S3 key.
+    required: true
+  commit:
+    description: Commit SHA the artefact was built from.
+    default: ${{ github.sha }}
+  digest:
+    description: Image manifest digest (sha256:...). Set this or subject-path.
+    default: ""
+  subject-path:
+    description: Path to the shipped artefact file; its sha256 is recorded. Set this or digest.
+    default: ""
+  root-name:
+    description: Override metadata.component name (pnpm names the root after the workspace).
+    default: ""
+  min-components:
+    description: Fail if the SBOM has fewer package components than this.
+    default: "1"
+  min-licence-pct:
+    description: Warn if fewer than this percent of components carry licence data.
+    default: "0"
+  spdx:
+    description: Also write an SPDX 2.3 JSON copy.
+    default: "true"
+  backfill:
+    description: Mark the SBOM as generated after the release rather than in the release build.
+    default: "false"
+  output-dir:
+    description: Where to write the stamped files. Defaults to a unique dir under RUNNER_TEMP.
+    default: ""
+  syft-version:
+    description: syft release used for the SPDX conversion.
+    default: v1.52.0
+outputs:
+  cdx:
+    description: Path to the stamped CycloneDX file (<kind>.cdx.json).
+  spdx:
+    description: Path to the SPDX file (<kind>.spdx.json), empty if spdx is false.
+  digest:
+    description: sha256:<hex> recorded in the SBOM.
+  key:
+    description: S3 key prefix, <product>/<component>/<version>/sha256-<hex>.
+  components:
+    description: Number of package components.
+  licence-pct:
+    description: Percent of components with licence data.
+runs:
+  using: node24
+  main: ../dist/stamp/index.js

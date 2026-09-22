@@ -1,0 +1,22 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "dependencyDashboard": true,
+  "enabledManagers": ["github-actions", "npm"],
+  "packageRules": [
+    {
+      "description": "GitHub Actions: always pin to a full SHA, keep a comment with the full version (e.g. # v6.4.0), and wait 7 days after a release before opening a PR. internalChecksFilter=strict suppresses the update (visible on the Dependency Dashboard) until the 7 days elapse, so no PR is created up front.",
+      "matchManagers": ["github-actions"],
+      "pinDigests": true,
+      "minimumReleaseAge": "7 days",
+      "internalChecksFilter": "strict"
+    },
+    {
+      "description": "npm: group dev tooling so bumps land as one PR; dist is rebuilt in the PR by CI failing until npm run package is committed.",
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["devDependencies"],
+      "groupName": "dev tooling",
+      "minimumReleaseAge": "7 days"
+    }
+  ]
+}

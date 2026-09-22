@@ -1,0 +1,89 @@
+name: gha-sbom image
+description: >
+  Generates a CycloneDX SBOM for a container image by digest with syft.
+  Skips when the repo already holds a CycloneDX attestation for that digest,
+  which is common for Bazel images that didn't change.
+inputs:
+  image:
+    description: Image repository without tag or digest, e.g. ghcr.io/markupai/helios-one.
+    required: true
+  digest:
+    description: Manifest digest to scan (sha256:...). For multi-arch, pass the platform manifest digest.
+    required: true
+  skip-if-attested:
+    description: Skip when a CycloneDX attestation already exists for the digest.
+    default: "true"
+  registry-username:
+    default: ${{ github.actor }}
+    description: Registry user for pulling the image.
+  registry-password:
+    default: ${{ github.token }}
+    description: Registry password or token for pulling the image.
+  github-token:
+    default: ${{ github.token }}
+    description: Token used to look up existing attestations.
+  syft-version:
+    default: v1.52.0
+    description: syft release to scan with.
+outputs:
+  sbom:
+    description: Path to the CycloneDX file, empty when skipped.
+    value: ${{ steps.plan.outputs.skip == 'true' && '' || steps.plan.outputs.path }}
+  skipped:
+    description: "`true` when the digest was already attested."
+    value: ${{ steps.plan.outputs.skip }}
+runs:
+  using: composite
+  steps:
+    - name: Check for an existing attestation
+      id: plan
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        DIGEST: ${{ inputs.digest }}
+        SKIP_IF_ATTESTED: ${{ inputs.skip-if-attested }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const digest = process.env.DIGEST;
+          if (!/^sha256:[0-9a-f]{64}$/.test(digest)) {
+            core.setFailed(`digest '${digest}' is not sha256:<64 hex>`);
+            return;
+          }
+          core.setOutput("path", `${process.env.RUNNER_TEMP}/gha-sbom-image-${digest.slice(7, 19)}.cdx.json`);
+
+          let skip = false;
+          if (process.env.SKIP_IF_ATTESTED === "true") {
+            try {
+              const { data } = await github.request("GET /repos/{owner}/{repo}/attestations/{subject_digest}", {
+                ...context.repo,
+                subject_digest: digest,
+              });
+              skip = (data.attestations ?? []).some((a) => {
+                const payload = a.bundle?.dsseEnvelope?.payload;
+                if (!payload) return false;
+                return JSON.parse(Buffer.from(payload, "base64").toString()).predicateType === "https://cyclonedx.org/bom";
+              });
+            } catch (e) {
+              if (e.status !== 404) throw e;
+            }
+          }
+          if (skip) core.notice(`${digest} already has a CycloneDX attestation, skipping`);
+          core.setOutput("skip", String(skip));
+
+    - name: Generate image SBOM
+      if: steps.plan.outputs.skip != 'true'
+      uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+      env:
+        # Per-file entries run to thousands per image and add nothing for
+        # vulnerability or licence review.
+        SYFT_FILE_METADATA_SELECTION: none
+      with:
+        image: ${{ inputs.image }}@${{ inputs.digest }}
+        format: cyclonedx-json@1.6
+        output-file: ${{ steps.plan.outputs.path }}
+        registry-username: ${{ inputs.registry-username }}
+        registry-password: ${{ inputs.registry-password }}
+        syft-version: ${{ inputs.syft-version }}
+        upload-artifact: false
+        upload-release-assets: false
+        dependency-snapshot: false

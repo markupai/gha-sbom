@@ -1,0 +1,142 @@
+name: gha-sbom publish
+description: >
+  Attests a stamped CycloneDX SBOM against the image digest or artefact,
+  copies both formats to S3, and optionally attaches them to a GitHub Release
+  and registers the image with Snyk.
+inputs:
+  cdx:
+    description: Stamped CycloneDX file (stamp output `cdx`).
+    required: true
+  spdx:
+    description: SPDX file (stamp output `spdx`). Optional.
+    default: ""
+  key:
+    description: S3 key prefix (stamp output `key`).
+    required: true
+  component:
+    description: Component name, used to prefix release asset names.
+    required: true
+  subject-name:
+    description: For images, the image repository without tag, e.g. ghcr.io/markupai/helios-one.
+    default: ""
+  subject-digest:
+    description: For images, the manifest digest (stamp output `digest`).
+    default: ""
+  subject-path:
+    description: For artefacts, the path to the shipped file.
+    default: ""
+  push-to-registry:
+    description: Push the attestation to the image registry alongside the digest.
+    default: "false"
+  attest:
+    description: Create the attestation. Turn off for dry runs.
+    default: "true"
+  bucket:
+    description: S3 bucket, normally vars.SBOM_BUCKET. Upload is skipped when empty.
+    default: ""
+  role-arn:
+    description: IAM role to assume through GitHub OIDC, normally vars.SBOM_ROLE_ARN. Upload is skipped when empty.
+    default: ""
+  aws-region:
+    description: Region of the SBOM bucket.
+    default: eu-west-1
+  release-tag:
+    description: Attach the SBOMs to this GitHub Release. Skipped when empty.
+    default: ""
+  snyk-image:
+    description: image@digest to register with `snyk container monitor`. Skipped when empty or snyk-token is empty.
+    default: ""
+  snyk-token:
+    description: Snyk API token, normally secrets.SNYK_TOKEN.
+    default: ""
+  snyk-tags:
+    description: Snyk project tags, e.g. product=helios,component=cortex,version=v2026.09.18.02.b4be53d.
+    default: ""
+  github-token:
+    default: ${{ github.token }}
+    description: Token for attestations and release uploads.
+outputs:
+  attestation-url:
+    description: URL of the attestation, empty when attest is false.
+    value: ${{ steps.attest.outputs.attestation-url }}
+runs:
+  using: composite
+  steps:
+    - name: Attest SBOM
+      id: attest
+      if: inputs.attest == 'true'
+      uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+      with:
+        subject-name: ${{ inputs.subject-name }}
+        subject-digest: ${{ inputs.subject-digest }}
+        subject-path: ${{ inputs.subject-path }}
+        sbom-path: ${{ inputs.cdx }}
+        push-to-registry: ${{ inputs.push-to-registry }}
+        github-token: ${{ inputs.github-token }}
+
+    - name: AWS credentials for the SBOM bucket
+      if: inputs.bucket != '' && inputs.role-arn != ''
+      uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+      with:
+        role-to-assume: ${{ inputs.role-arn }}
+        aws-region: ${{ inputs.aws-region }}
+        role-session-name: gha-sbom-${{ github.run_id }}
+        # Self-hosted runners carry their own IRSA credentials; use only the SBOM role here.
+        unset-current-credentials: true
+
+    - name: Upload to S3
+      if: inputs.bucket != '' && inputs.role-arn != ''
+      shell: bash
+      env:
+        BUCKET: ${{ inputs.bucket }}
+        KEY: ${{ inputs.key }}
+        CDX: ${{ inputs.cdx }}
+        SPDX: ${{ inputs.spdx }}
+      run: |
+        for f in "$CDX" ${SPDX:+"$SPDX"}; do
+          aws s3 cp "$f" "s3://$BUCKET/$KEY/$(basename "$f")" --checksum-algorithm SHA256 --content-type application/json --only-show-errors
+          echo "uploaded s3://$BUCKET/$KEY/$(basename "$f")"
+        done
+
+    - name: Attach to GitHub Release
+      if: inputs.release-tag != ''
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        TAG: ${{ inputs.release-tag }}
+        PREFIX: ${{ inputs.component }}
+        CDX: ${{ inputs.cdx }}
+        SPDX: ${{ inputs.spdx }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const fs = require("node:fs");
+          const path = require("node:path");
+          const { data: release } = await github.rest.repos.getReleaseByTag({ ...context.repo, tag: process.env.TAG });
+          for (const file of [process.env.CDX, process.env.SPDX].filter(Boolean)) {
+            const name = `${process.env.PREFIX}-${path.basename(file)}`;
+            const existing = release.assets.find((a) => a.name === name);
+            if (existing) await github.rest.repos.deleteReleaseAsset({ ...context.repo, asset_id: existing.id });
+            await github.rest.repos.uploadReleaseAsset({
+              ...context.repo,
+              release_id: release.id,
+              name,
+              data: fs.readFileSync(file),
+              headers: { "content-type": "application/json" },
+            });
+            core.info(`attached ${name} to ${process.env.TAG}`);
+          }
+
+    - name: Set up Snyk
+      if: inputs.snyk-image != '' && inputs.snyk-token != ''
+      uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04 # v1.0.0
+
+    - name: Snyk container monitor
+      if: inputs.snyk-image != '' && inputs.snyk-token != ''
+      shell: bash
+      env:
+        SNYK_TOKEN: ${{ inputs.snyk-token }}
+        IMAGE: ${{ inputs.snyk-image }}
+        TAGS: ${{ inputs.snyk-tags }}
+        REGISTRY_USER: ${{ github.actor }}
+        REGISTRY_PASSWORD: ${{ inputs.github-token }}
+      run: snyk container monitor "$IMAGE" --username="$REGISTRY_USER" --password="$REGISTRY_PASSWORD" ${TAGS:+--project-tags="$TAGS"}

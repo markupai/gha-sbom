@@ -1,0 +1,144 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "component": {
+      "type": "application",
+      "name": "markupai-sidebar",
+      "version": "1.0.0",
+      "bom-ref": "markupai-sidebar@1.0.0",
+      "purl": "pkg:npm/markupai-sidebar@1.0.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:path",
+          "value": ""
+        },
+        {
+          "name": "cdx:npm:package:private",
+          "value": "true"
+        }
+      ]
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "sidebar",
+      "group": "@markupai-sidebar",
+      "version": "2.1.0",
+      "bom-ref": "@markupai-sidebar/sidebar@2.1.0",
+      "purl": "pkg:npm/%40markupai-sidebar/sidebar@2.1.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@markupai-sidebar/sidebar"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "auth0-spa-js",
+      "group": "@auth0",
+      "version": "2.24.1",
+      "bom-ref": "@auth0/auth0-spa-js@2.24.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40auth0/auth0-spa-js@2.24.1",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@auth0/auth0-spa-js/-/auth0-spa-js-2.24.1.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "892d7c7c19565b143f14fb56816cd8604226b0d46e9891b6719d3cc55d07b04996b5306ffb9e00f9f9f2171f5e88d04fedc2e9d1e9b00c38e0786fa14046d504"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@auth0/auth0-spa-js"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "auth0-auth-js",
+      "group": "@auth0",
+      "version": "1.12.1",
+      "bom-ref": "@auth0/auth0-auth-js@1.12.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40auth0/auth0-auth-js@1.12.1",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@auth0/auth0-auth-js/-/auth0-auth-js-1.12.1.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "62060e00699fc0ee3460e6246125bb5ef13a6feaa47655dda7306c86f3a30a2a3281eb14c48c36a917ab8a55b5ffc5d0578d669c5bd020f9ec4dd10e1cdf4178"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@auth0/auth0-auth-js"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "jose",
+      "version": "6.2.9",
+      "bom-ref": "jose@6.2.9",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "acknowledgement": "declared"
+          }
+        }
+      ],
+      "purl": "pkg:npm/jose@6.2.9",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/jose/-/jose-6.2.9.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "5eb72164e159525fd3def4f045ef172be709ac6b4c178b61d404670dfc1b05714a4e11a196cc4413866ed37003fdb8c94adffd8d3fe6c6b38290958e83beda3c"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/jose"
+        }
+      ]
+    }
+  ]
+}
