@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { run } from "../src/stamp/main.js";
 
 // Drives the action the way the runner does: inputs as INPUT_* env vars,
@@ -32,6 +32,9 @@ function outputs(file: string): Record<string, string> {
 describe("stamp action", () => {
   let dir: string;
   let outFile: string;
+  // @actions/core writes workflow commands (::error:: etc.) to stdout. Capture
+  // them so the failure-path tests don't show up as error annotations in CI.
+  let stdout: string[];
 
   beforeEach(() => {
     for (const k of Object.keys(process.env)) {
@@ -43,7 +46,19 @@ describe("stamp action", () => {
     process.env.GITHUB_OUTPUT = outFile;
     process.env.RUNNER_TEMP = dir;
     process.exitCode = undefined;
+    stdout = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array) => {
+      stdout.push(String(chunk));
+      return true;
+    });
   });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    process.exitCode = undefined;
+  });
+
+  const errors = () => stdout.filter((l) => l.startsWith("::error::"));
 
   it("stamps an artefact SBOM with the file's sha256", async () => {
     setInputs({
@@ -56,6 +71,8 @@ describe("stamp action", () => {
     });
     await run();
     expect(process.exitCode).toBeUndefined();
+    expect(errors()).toEqual([]);
+    expect(stdout.join("")).toContain("figma-plugin source SBOM: 4 components");
 
     const o = outputs(outFile);
     const expected = createHash("sha256")
@@ -83,6 +100,7 @@ describe("stamp action", () => {
     });
     await run();
     expect(process.exitCode).toBe(1);
+    expect(errors().join("")).toContain("has 0 components, expected at least 1");
   });
 
   it("refuses both digest and subject-path", async () => {
@@ -97,5 +115,6 @@ describe("stamp action", () => {
     });
     await run();
     expect(process.exitCode).toBe(1);
+    expect(errors().join("")).toContain("set digest or subject-path, not both");
   });
 });
