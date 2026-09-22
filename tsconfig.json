@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noUnusedLocals": true,
+    "outDir": "./dist",
+    "resolveJsonModule": true,
+    "strict": true,
+    "target": "ES2022"
+  },
+  "include": ["src", "test"]
+}

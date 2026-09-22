@@ -1,0 +1,219 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "component": {
+      "type": "library",
+      "bom-ref": "pkg:maven/com.acrolinx.platform/language-server-multi-module@0.29.1-SNAPSHOT?type=pom",
+      "group": "com.acrolinx.platform",
+      "name": "language-server-multi-module",
+      "version": "0.29.1-SNAPSHOT",
+      "purl": "pkg:maven/com.acrolinx.platform/language-server-multi-module@0.29.1-SNAPSHOT?type=pom",
+      "externalReferences": [
+        {
+          "type": "build-system",
+          "url": "https://github.com/markupai/scalable-language-servers"
+        },
+        {
+          "type": "distribution-intake",
+          "url": "https://maven.pkg.github.com/markupai/scalable-language-servers"
+        },
+        {
+          "type": "issue-tracker",
+          "url": "https://github.com/markupai/scalable-language-servers/issues"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/markupai/scalable-language-servers"
+        }
+      ]
+    },
+    "properties": [
+      {
+        "name": "markupai:version",
+        "value": "stale"
+      },
+      {
+        "name": "cdx:maven:package:test",
+        "value": "keep"
+      }
+    ]
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:maven/javax.xml.bind/jaxb-api@2.3.1?type=jar",
+      "publisher": "Oracle Corporation",
+      "group": "javax.xml.bind",
+      "name": "jaxb-api",
+      "version": "2.3.1",
+      "description": "JAXB (JSR 222) API",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "bcf270d320f645ad19f5edb60091e87f"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "8531ad5ac454cc2deb9d4d32c40c4d7451939b5d"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "88b955a0df57880a26a74708bc34f74dcaf8ebf4e78843a28b50eae945732b06"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "93a47b245ab830d664a48c9d14e86198a38809ce94f72ca66b3d68746ae1d7b902f6fef2d1ac1a92c01701549ae80a07db69bd822ffd831a95d8dbffad435790"
+        },
+        {
+          "alg": "SHA-384",
+          "content": "1eb2d7f307bda8cbf6a4ab5b2b97d830d33ca48ad94eb4bb1cbce860c54fca96285dbcb1ce9b164dbf37d4475f9a198f"
+        },
+        {
+          "alg": "SHA3-384",
+          "content": "8df7409d3f60888f3a80f4d49af66c2cab6dc9f00e79c87c17703faad19d8ba6c8fc96ad897434170ce2686952921cdd"
+        },
+        {
+          "alg": "SHA3-256",
+          "content": "41338683257d5ecead579ccc137bdef7bc4fea685d039a3d894e1d6730425e1d"
+        },
+        {
+          "alg": "SHA3-512",
+          "content": "3371a96171f69876b0e6b8354674d252680e6d52c509a2645b1a0b0d7f9e176274bde6c89edb40986264733ffb6794cb7b2cba417666b1e82075bd4fd51197b6"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "CDDL-1.1"
+          }
+        },
+        {
+          "license": {
+            "id": "GPL-2.0-with-classpath-exception"
+          }
+        }
+      ],
+      "purl": "pkg:maven/javax.xml.bind/jaxb-api@2.3.1?type=jar",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/javaee/jaxb-spec/jaxb-api"
+        },
+        {
+          "type": "distribution-intake",
+          "url": "https://maven.java.net/service/local/staging/deploy/maven2/"
+        },
+        {
+          "type": "issue-tracker",
+          "url": "https://github.com/javaee/jaxb-spec/issues"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/javaee/jaxb-spec.git/jaxb-api"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:maven/javax.activation/javax.activation-api@1.2.0?type=jar",
+      "publisher": "Oracle",
+      "group": "javax.activation",
+      "name": "javax.activation-api",
+      "version": "1.2.0",
+      "description": "JavaBeans Activation Framework API jar",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "5e50e56bcf4a3ef3bc758f69f7643c3b"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "85262acf3ca9816f9537ca47d5adeabaead7cb16"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "43fdef0b5b6ceb31b0424b208b930c74ab58fac2ceeb7b3f6fd3aeb8b5ca4393"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "8ee0db43ae402f0079a836ef2bff5d15160e3ff9d585c3283f4cf474be4edd2fcc8714d8f032efd72cae77ec5f6d304fc24fa094d9cdba5cf72966cc964af6c9"
+        },
+        {
+          "alg": "SHA-384",
+          "content": "d38a6af7ed00f13de8b46d49b9592af9b67adf3df47ddae5e4672f989f3f39101d446a77d1c11319acf8ff0a5b4feedf"
+        },
+        {
+          "alg": "SHA3-384",
+          "content": "cfee76de5976d5994758a06113368092f09b0729d753b99969d6a5ec32919428bd7c270c98cbbc682ff8ebcf2b93fd8d"
+        },
+        {
+          "alg": "SHA3-256",
+          "content": "aff48d0f28d8a99690c5a84c3fffdb3775452d5387e5698f4c9028c92a3b4888"
+        },
+        {
+          "alg": "SHA3-512",
+          "content": "0507ece74b3147de60a830071bd434569c82e03f414a2b7f0d8a225dda36720d2e2194799cdc04def1909fdec21059b67c518bb9162f7f605764d542194e721d"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "(CDDL-1.0 OR GPL-2.0-with-classpath-exception)"
+        }
+      ],
+      "purl": "pkg:maven/javax.activation/javax.activation-api@1.2.0?type=jar",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "http://java.net/all/javax.activation-api/"
+        },
+        {
+          "type": "distribution-intake",
+          "url": "https://maven.java.net/service/local/staging/deploy/maven2/"
+        },
+        {
+          "type": "issue-tracker",
+          "url": "https://github.com/javaee/activation/issues"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/javaee/activation/javax.activation-api"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:maven/com.acrolinx.platform/language-server-bom@0.29.1-SNAPSHOT?type=pom",
+      "group": "com.acrolinx.platform",
+      "name": "language-server-bom",
+      "version": "0.29.1-SNAPSHOT",
+      "description": "Bill of materials to make sure a consistent set of versions is used in all modules",
+      "purl": "pkg:maven/com.acrolinx.platform/language-server-bom@0.29.1-SNAPSHOT?type=pom",
+      "externalReferences": [
+        {
+          "type": "build-system",
+          "url": "https://github.com/markupai/scalable-language-servers"
+        },
+        {
+          "type": "distribution-intake",
+          "url": "https://maven.pkg.github.com/markupai/scalable-language-servers"
+        },
+        {
+          "type": "issue-tracker",
+          "url": "https://github.com/markupai/scalable-language-servers/issues"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/markupai/scalable-language-servers/language-server-bom"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "name": "/app/x.jar"
+    }
+  ]
+}

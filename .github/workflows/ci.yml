@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint:check
+      - run: npm run type-check
+      - run: npm test
+      - run: npm run package
+      - name: dist is up to date
+        run: |
+          if ! git diff --quiet -- dist; then
+            echo "::error::dist/ is out of date. Run npm run package and commit the result."
+            git diff --stat -- dist
+            exit 1
+          fi
+
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
+
+  # Runs the actions from this checkout the way callers use them. Windows is
+  # included because the .NET release jobs run there.
+  self-test:
+    needs: check
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Stamp
+        id: stamp
+        uses: ./stamp
+        with:
+          sbom: test/fixtures/npm.cdx.json
+          kind: source
+          product: gha-sbom
+          component: self-test
+          version: ci-${{ github.run_number }}
+          subject-path: test/fixtures/artefact.bin
+          min-components: "4"
+
+      - name: Check outputs
+        shell: bash
+        env:
+          CDX: ${{ steps.stamp.outputs.cdx }}
+          SPDX: ${{ steps.stamp.outputs.spdx }}
+          KEY: ${{ steps.stamp.outputs.key }}
+        run: |
+          test -s "$CDX" && test -s "$SPDX"
+          jq -e '.metadata.properties[] | select(.name == "markupai:component" and .value == "self-test")' "$CDX"
+          jq -e '.spdxVersion == "SPDX-2.3" and (.creationInfo.comment | contains("markupai:component=self-test"))' "$SPDX"
+          [[ "$KEY" == gha-sbom/self-test/ci-* ]]
+
+      - name: Publish (attest only, no S3 or release)
+        if: matrix.os == 'ubuntu-latest'
+        uses: ./publish
+        with:
+          cdx: ${{ steps.stamp.outputs.cdx }}
+          spdx: ${{ steps.stamp.outputs.spdx }}
+          key: ${{ steps.stamp.outputs.key }}
+          component: self-test
+          subject-path: test/fixtures/artefact.bin
+          bucket: ""
+          role-arn: ""
