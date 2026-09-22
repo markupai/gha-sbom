@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 export type Kind = "source" | "image";
 
 export interface Property {
@@ -18,6 +20,7 @@ export interface Component {
 export interface CycloneDx {
   bomFormat: string;
   specVersion?: string;
+  serialNumber?: string;
   metadata?: {
     timestamp?: string;
     component?: Component;
@@ -130,5 +133,7 @@ export function stamp(bom: CycloneDx, meta: StampMeta, now: Date): CycloneDx {
     ...traceProperties(meta),
   ];
 
-  return { ...bom, metadata };
+  // actions/attest only accepts CycloneDX with a serialNumber; every generator
+  // we use sets one, but don't let one that doesn't break attestation.
+  return { ...bom, serialNumber: bom.serialNumber ?? `urn:uuid:${randomUUID()}`, metadata };
 }

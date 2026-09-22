@@ -39,7 +39,7 @@ import { setTimeout as setTimeout$1 } from 'timers';
 import { createReadStream, existsSync } from 'node:fs';
 import { readFile, mkdir as mkdir$1, writeFile as writeFile$1, rm as rm$1 } from 'node:fs/promises';
 import path$1 from 'node:path';
-import { createHash } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import * as stream from 'stream';
 
 // We use any as a valid input type
@@ -30357,7 +30357,9 @@ function stamp(bom, meta, now) {
         ...(metadata.properties ?? []).filter((p) => !p.name.startsWith(PREFIX)),
         ...traceProperties(meta),
     ];
-    return { ...bom, metadata };
+    // actions/attest only accepts CycloneDX with a serialNumber; every generator
+    // we use sets one, but don't let one that doesn't break attestation.
+    return { ...bom, serialNumber: bom.serialNumber ?? `urn:uuid:${randomUUID()}`, metadata };
 }
 
 async function sha256File(path) {

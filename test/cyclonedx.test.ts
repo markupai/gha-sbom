@@ -100,6 +100,17 @@ describe("stamp", () => {
     expect(out.metadata?.component?.purl).toBeUndefined();
   });
 
+  it("adds a serialNumber when the generator left it out", () => {
+    const input = fixture("npm.cdx.json");
+    expect(input.serialNumber).toBeUndefined();
+    expect(stamp(input, meta, now).serialNumber).toMatch(/^urn:uuid:[0-9a-f-]{36}$/);
+  });
+
+  it("keeps the generator's serialNumber", () => {
+    const input = { ...fixture("npm.cdx.json"), serialNumber: "urn:uuid:keep" };
+    expect(stamp(input, meta, now).serialNumber).toBe("urn:uuid:keep");
+  });
+
   it("leaves components untouched", () => {
     const input = fixture("npm.cdx.json");
     expect(stamp(input, meta, now).components).toEqual(input.components);
