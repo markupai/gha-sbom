@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -89,7 +90,10 @@ jobs:
           jq -e '.spdxVersion == "SPDX-2.3" and (.creationInfo.comment | contains("markupai:component=self-test"))' "$SPDX"
           [[ "$KEY" == gha-sbom/self-test/ci-* ]]
 
-      - name: Publish (attest only, no S3 or release)
+      # Uploads to the real bucket on main only: the SBOM role trusts main,
+      # tags and environments, not PRs. Objects land under gha-sbom/self-test/
+      # and stay locked (GOVERNANCE, 10y) like everything else; a few KB a run.
+      - name: Publish (attest, plus S3 on main)
         if: matrix.runner == 'markupai-dev-us1-amd64'
         uses: ./publish
         with:
@@ -98,5 +102,5 @@ jobs:
           key: ${{ steps.stamp.outputs.key }}
           component: self-test
           subject-path: test/fixtures/artefact.bin
-          bucket: ""
-          role-arn: ""
+          bucket: ${{ github.ref == 'refs/heads/main' && vars.SBOM_BUCKET || '' }}
+          role-arn: ${{ github.ref == 'refs/heads/main' && vars.SBOM_ROLE_ARN || '' }}
