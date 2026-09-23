@@ -93,6 +93,28 @@ jobs:
       # Uploads to the real bucket on main only: the SBOM role trusts main,
       # tags and environments, not PRs. Objects land under gha-sbom/self-test/
       # and stay locked (GOVERNANCE, 10y) like everything else; a few KB a run.
+      # TEMPORARY: prints the OIDC claims (not the token) to compare against the
+      # role trust policy, and whether AWS credential env vars are present.
+      - name: Debug OIDC claims
+        if: matrix.runner == 'markupai-dev-us1-amd64'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const token = await core.getIDToken("sts.amazonaws.com");
+            const claims = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString());
+            core.info(JSON.stringify({
+              iss: claims.iss,
+              aud: claims.aud,
+              sub: claims.sub,
+              repository: claims.repository,
+              repository_owner: claims.repository_owner,
+              repository_owner_id: claims.repository_owner_id,
+              ref: claims.ref,
+              environment: claims.environment ?? null,
+            }, null, 2));
+            const present = Object.keys(process.env).filter((k) => k.startsWith("AWS_")).sort();
+            core.info(`AWS_* env present: ${present.join(", ") || "none"}`);
+
       - name: Publish (attest, plus S3 on main)
         if: matrix.runner == 'markupai-dev-us1-amd64'
         uses: ./publish
