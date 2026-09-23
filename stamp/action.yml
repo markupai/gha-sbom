@@ -7,7 +7,9 @@ inputs:
     description: Path to the CycloneDX JSON SBOM from the generator.
     required: true
   kind:
-    description: "`source` (from the ecosystem tool) or `image` (from syft on the image)."
+    description: >
+      `source` (from the ecosystem tool), `image` (from syft on the image), or
+      `release` (an index of a whole release, keyed under <product>/_releases/<version>).
     required: true
   product:
     description: Product the component ships in, e.g. helios, sls, integrations.
@@ -22,7 +24,7 @@ inputs:
     description: Commit SHA the artefact was built from.
     default: ${{ github.sha }}
   digest:
-    description: Image manifest digest (sha256:...). Set this or subject-path.
+    description: Image manifest digest (sha256:...). Set this or subject-path; a release index takes neither.
     default: ""
   subject-path:
     description: Path to the shipped artefact file; its sha256 is recorded. Set this or digest.

@@ -72,9 +72,9 @@ jobs:
         with:
           sbom: test/fixtures/npm.cdx.json
           kind: source
-          product: gha-sbom
-          component: self-test
-          version: ci-${{ github.run_number }}
+          product: _selftest
+          component: gha-sbom
+          version: run-${{ github.run_id }}
           subject-path: test/fixtures/artefact.bin
           min-components: "4"
 
@@ -86,9 +86,9 @@ jobs:
           KEY: ${{ steps.stamp.outputs.key }}
         run: |
           test -s "$CDX" && test -s "$SPDX"
-          jq -e '.metadata.properties[] | select(.name == "markupai:component" and .value == "self-test")' "$CDX"
-          jq -e '.spdxVersion == "SPDX-2.3" and (.creationInfo.comment | contains("markupai:component=self-test"))' "$SPDX"
-          [[ "$KEY" == gha-sbom/self-test/ci-* ]]
+          jq -e '.metadata.properties[] | select(.name == "markupai:component" and .value == "gha-sbom")' "$CDX"
+          jq -e '.spdxVersion == "SPDX-2.3" and (.creationInfo.comment | contains("markupai:component=gha-sbom"))' "$SPDX"
+          [[ "$KEY" == _selftest/gha-sbom/run-* ]]
 
       # Uploads to the real bucket on main only: the SBOM role trusts main,
       # tags and environments, not PRs. Objects land under gha-sbom/self-test/
@@ -100,7 +100,7 @@ jobs:
           cdx: ${{ steps.stamp.outputs.cdx }}
           spdx: ${{ steps.stamp.outputs.spdx }}
           key: ${{ steps.stamp.outputs.key }}
-          component: self-test
+          component: gha-sbom
           subject-path: test/fixtures/artefact.bin
           bucket: ${{ github.ref == 'refs/heads/main' && vars.SBOM_BUCKET || '' }}
           role-arn: ${{ github.ref == 'refs/heads/main' && vars.SBOM_ROLE_ARN || '' }}

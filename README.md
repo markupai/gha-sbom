@@ -104,7 +104,22 @@ CycloneDX `metadata.properties` (and the SPDX `creationInfo.comment`):
 `markupai:image-digest` or `markupai:sha256`, `markupai:sbom-kind`,
 `markupai:s3-key`, `markupai:ci-run`, `markupai:backfill`.
 
-S3 layout: `<product>/<component>/<version>/sha256-<hex>/{source,image}.{cdx,spdx}.json`.
+## S3 layout
+
+```
+<product>/<component>/<version>/sha256-<hex>/{source,image}.{cdx,spdx}.json
+<product>/_releases/<version>/release.{cdx,spdx}.json
+_selftest/gha-sbom/run-<id>/...
+```
+
+Per-component SBOMs are keyed by digest, so rebuilding a version never
+overwrites an earlier one, and the key names what you verify against.
+
+A release index (`kind: release`) lists every component in a release with its
+digest, so one GET answers "everything in SLS v0.29.0" without knowing the
+component names. It takes no digest of its own. Build it by merging the
+per-component BOMs (`cyclonedx merge --hierarchical`), then stamp with
+`kind: release`.
 
 ## Guards
 
