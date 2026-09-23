@@ -30297,8 +30297,13 @@ function validateMeta(meta) {
     }
     if (!COMMIT.test(meta.commit))
         throw new Error(`commit '${meta.commit}' is not a git SHA`);
-    if (!DIGEST.test(meta.digest))
-        throw new Error(`digest '${meta.digest}' is not sha256:<64 hex>`);
+    if (meta.kind === "release") {
+        if (meta.digest)
+            throw new Error("a release index covers many digests, so it takes none");
+    }
+    else if (!meta.digest || !DIGEST.test(meta.digest)) {
+        throw new Error(`digest '${meta.digest ?? ""}' is not sha256:<64 hex>`);
+    }
 }
 function parseCycloneDx(text, source) {
     let doc;
@@ -30313,8 +30318,15 @@ function parseCycloneDx(text, source) {
     }
     return doc;
 }
+/**
+ * Per-component SBOMs are keyed by digest, so a rebuild of the same version
+ * never overwrites an earlier one. A release index lives under _releases so one
+ * GET answers "everything in release X" without knowing the component names.
+ */
 function s3Key(meta) {
-    return `${meta.product}/${meta.component}/${meta.version}/sha256-${meta.digest.slice(7)}`;
+    if (meta.kind === "release")
+        return `${meta.product}/_releases/${meta.version}`;
+    return `${meta.product}/${meta.component}/${meta.version}/sha256-${(meta.digest ?? "").slice(7)}`;
 }
 /** Counts packages, not the per-file entries syft can emit. */
 function stats(bom) {
@@ -30333,10 +30345,14 @@ function traceProperties(meta) {
         { name: "markupai:component", value: meta.component },
         { name: "markupai:version", value: meta.version },
         { name: "markupai:commit", value: meta.commit },
-        {
-            name: meta.subject === "image" ? "markupai:image-digest" : "markupai:sha256",
-            value: meta.digest,
-        },
+        ...(meta.digest
+            ? [
+                {
+                    name: meta.subject === "image" ? "markupai:image-digest" : "markupai:sha256",
+                    value: meta.digest,
+                },
+            ]
+            : []),
         { name: "markupai:sbom-kind", value: meta.kind },
         { name: "markupai:s3-key", value: s3Key(meta) },
         { name: "markupai:ci-run", value: meta.runUrl },
@@ -33768,7 +33784,7 @@ function intInput(name) {
         throw new Error(`${name} must be a non-negative integer`);
     return n;
 }
-async function resolveDigest() {
+async function resolveDigest(kind) {
     const digest = getInput("digest");
     const subjectPath = getInput("subject-path");
     if (digest && subjectPath)
@@ -33780,14 +33796,17 @@ async function resolveDigest() {
             throw new Error(`subject-path not found: ${subjectPath}`);
         return { digest: await sha256File(subjectPath), subject: "artefact" };
     }
+    if (kind === "release")
+        return {};
     throw new Error("set digest (images) or subject-path (artefacts)");
 }
 async function run() {
     try {
         const sbomPath = getInput("sbom", { required: true });
         const kind = getInput("kind", { required: true });
-        if (kind !== "source" && kind !== "image")
-            throw new Error(`kind must be source or image`);
+        if (kind !== "source" && kind !== "image" && kind !== "release") {
+            throw new Error("kind must be source, image or release");
+        }
         const env = process.env;
         const meta = {
             product: getInput("product", { required: true }),
@@ -33798,7 +33817,7 @@ async function run() {
             backfill: getBooleanInput("backfill"),
             rootName: getInput("root-name") || undefined,
             runUrl: `${env.GITHUB_SERVER_URL ?? "https://github.com"}/${env.GITHUB_REPOSITORY ?? ""}/actions/runs/${env.GITHUB_RUN_ID ?? ""}`,
-            ...(await resolveDigest()),
+            ...(await resolveDigest(kind)),
         };
         validateMeta(meta);
         const bom = parseCycloneDx(await readFile(sbomPath, "utf8"), sbomPath);
@@ -33812,7 +33831,7 @@ async function run() {
             warning(`${meta.component} ${kind} SBOM has licence data on ${String(s.licensed)}/${String(s.components)} components (${String(s.licencePct)}%), below ${String(minLicencePct)}%`);
         }
         const outDir = getInput("output-dir") ||
-            path$1.join(env.RUNNER_TEMP ?? ".", "gha-sbom", meta.component, meta.digest.slice(7, 19));
+            path$1.join(env.RUNNER_TEMP ?? ".", "gha-sbom", meta.component, (meta.digest ?? meta.version).slice(0, 24).replace(/[^A-Za-z0-9._-]/g, "-"));
         await mkdir$1(outDir, { recursive: true });
         const cdxPath = path$1.join(outDir, `${kind}.cdx.json`);
         await writeFile$1(cdxPath, JSON.stringify(stamp(bom, meta, new Date()), null, 2));
@@ -33828,10 +33847,10 @@ async function run() {
             await writeFile$1(spdxPath, JSON.stringify(finaliseSpdx(doc, meta), null, 2));
             await rm$1(raw);
         }
-        info(`${meta.component} ${kind} SBOM: ${String(s.components)} components, licence data on ${String(s.licencePct)}%, ${meta.digest}`);
+        info(`${meta.component} ${kind} SBOM: ${String(s.components)} components, licence data on ${String(s.licencePct)}%${meta.digest ? `, ${meta.digest}` : ""}`);
         setOutput("cdx", cdxPath);
         setOutput("spdx", spdxPath);
-        setOutput("digest", meta.digest);
+        setOutput("digest", meta.digest ?? "");
         setOutput("key", s3Key(meta));
         setOutput("components", s.components);
         setOutput("licence-pct", s.licencePct);

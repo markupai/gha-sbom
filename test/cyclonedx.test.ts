@@ -121,4 +121,31 @@ describe("s3Key", () => {
   it("uses a colon-free digest segment", () => {
     expect(s3Key(meta)).toBe(`sls/language-server/v0.29.0/sha256-${"a".repeat(64)}`);
   });
+
+  it("puts a release index under _releases so one GET covers the whole release", () => {
+    expect(s3Key({ ...meta, kind: "release", digest: undefined })).toBe("sls/_releases/v0.29.0");
+  });
+});
+
+describe("release index", () => {
+  const release = { ...meta, kind: "release" as const, digest: undefined, subject: undefined };
+
+  it("is allowed without a digest", () => {
+    expect(() => {
+      validateMeta(release);
+    }).not.toThrow();
+  });
+
+  it("refuses a digest, since it covers many", () => {
+    expect(() => {
+      validateMeta({ ...release, digest: `sha256:${"a".repeat(64)}` });
+    }).toThrow("covers many digests");
+  });
+
+  it("stamps no digest property", () => {
+    const props = stamp(fixture("npm.cdx.json"), release, new Date()).metadata?.properties ?? [];
+    expect(props.map((p) => p.name)).not.toContain("markupai:image-digest");
+    expect(props.map((p) => p.name)).not.toContain("markupai:sha256");
+    expect(props).toContainEqual({ name: "markupai:s3-key", value: "sls/_releases/v0.29.0" });
+  });
 });

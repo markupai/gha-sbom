@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
+  type Kind,
   parseCycloneDx,
   s3Key,
   stamp,
@@ -22,7 +23,7 @@ function intInput(name: string): number {
   return n;
 }
 
-async function resolveDigest(): Promise<Pick<StampMeta, "digest" | "subject">> {
+async function resolveDigest(kind: Kind): Promise<Pick<StampMeta, "digest" | "subject">> {
   const digest = core.getInput("digest");
   const subjectPath = core.getInput("subject-path");
   if (digest && subjectPath) throw new Error("set digest or subject-path, not both");
@@ -31,6 +32,7 @@ async function resolveDigest(): Promise<Pick<StampMeta, "digest" | "subject">> {
     if (!existsSync(subjectPath)) throw new Error(`subject-path not found: ${subjectPath}`);
     return { digest: await sha256File(subjectPath), subject: "artefact" };
   }
+  if (kind === "release") return {};
   throw new Error("set digest (images) or subject-path (artefacts)");
 }
 
@@ -38,7 +40,9 @@ export async function run(): Promise<void> {
   try {
     const sbomPath = core.getInput("sbom", { required: true });
     const kind = core.getInput("kind", { required: true });
-    if (kind !== "source" && kind !== "image") throw new Error(`kind must be source or image`);
+    if (kind !== "source" && kind !== "image" && kind !== "release") {
+      throw new Error("kind must be source, image or release");
+    }
     const env = process.env;
 
     const meta: StampMeta = {
@@ -50,7 +54,7 @@ export async function run(): Promise<void> {
       backfill: core.getBooleanInput("backfill"),
       rootName: core.getInput("root-name") || undefined,
       runUrl: `${env.GITHUB_SERVER_URL ?? "https://github.com"}/${env.GITHUB_REPOSITORY ?? ""}/actions/runs/${env.GITHUB_RUN_ID ?? ""}`,
-      ...(await resolveDigest()),
+      ...(await resolveDigest(kind)),
     };
     validateMeta(meta);
 
@@ -71,7 +75,12 @@ export async function run(): Promise<void> {
 
     const outDir =
       core.getInput("output-dir") ||
-      path.join(env.RUNNER_TEMP ?? ".", "gha-sbom", meta.component, meta.digest.slice(7, 19));
+      path.join(
+        env.RUNNER_TEMP ?? ".",
+        "gha-sbom",
+        meta.component,
+        (meta.digest ?? meta.version).slice(0, 24).replace(/[^A-Za-z0-9._-]/g, "-"),
+      );
     await mkdir(outDir, { recursive: true });
     const cdxPath = path.join(outDir, `${kind}.cdx.json`);
     await writeFile(cdxPath, JSON.stringify(stamp(bom, meta, new Date()), null, 2));
@@ -90,11 +99,11 @@ export async function run(): Promise<void> {
     }
 
     core.info(
-      `${meta.component} ${kind} SBOM: ${String(s.components)} components, licence data on ${String(s.licencePct)}%, ${meta.digest}`,
+      `${meta.component} ${kind} SBOM: ${String(s.components)} components, licence data on ${String(s.licencePct)}%${meta.digest ? `, ${meta.digest}` : ""}`,
     );
     core.setOutput("cdx", cdxPath);
     core.setOutput("spdx", spdxPath);
-    core.setOutput("digest", meta.digest);
+    core.setOutput("digest", meta.digest ?? "");
     core.setOutput("key", s3Key(meta));
     core.setOutput("components", s.components);
     core.setOutput("licence-pct", s.licencePct);

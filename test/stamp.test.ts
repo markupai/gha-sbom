@@ -89,6 +89,23 @@ describe("stamp action", () => {
     expect(bom.metadata.properties).toContainEqual({ name: "markupai:sha256", value: o.digest });
   });
 
+  it("stamps a release index without a digest", async () => {
+    setInputs({
+      sbom: "test/fixtures/npm.cdx.json",
+      kind: "release",
+      product: "helios",
+      component: "helios",
+      version: "v2026.09.18.02.b4be53d",
+    });
+    await run();
+    expect(errors()).toEqual([]);
+
+    const o = outputs(outFile);
+    expect(o.key).toBe("helios/_releases/v2026.09.18.02.b4be53d");
+    expect(o.digest).toBe("");
+    expect(o.cdx.endsWith("release.cdx.json")).toBe(true);
+  });
+
   it("fails on an empty SBOM instead of publishing it", async () => {
     setInputs({
       sbom: "test/fixtures/empty.cdx.json",

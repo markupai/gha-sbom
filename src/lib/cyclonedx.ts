@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-export type Kind = "source" | "image";
+export type Kind = "source" | "image" | "release";
 
 export interface Property {
   name: string;
@@ -36,10 +36,10 @@ export interface StampMeta {
   component: string;
   version: string;
   commit: string;
-  /** sha256:<hex> of the image manifest or the artefact file */
-  digest: string;
+  /** sha256:<hex> of the image manifest or the artefact file. Absent for a release index. */
+  digest?: string;
   /** image digest vs artefact file hash; they are recorded under different property names */
-  subject: "image" | "artefact";
+  subject?: "image" | "artefact";
   kind: Kind;
   backfill: boolean;
   runUrl: string;
@@ -61,7 +61,11 @@ export function validateMeta(meta: StampMeta): void {
     }
   }
   if (!COMMIT.test(meta.commit)) throw new Error(`commit '${meta.commit}' is not a git SHA`);
-  if (!DIGEST.test(meta.digest)) throw new Error(`digest '${meta.digest}' is not sha256:<64 hex>`);
+  if (meta.kind === "release") {
+    if (meta.digest) throw new Error("a release index covers many digests, so it takes none");
+  } else if (!meta.digest || !DIGEST.test(meta.digest)) {
+    throw new Error(`digest '${meta.digest ?? ""}' is not sha256:<64 hex>`);
+  }
 }
 
 export function parseCycloneDx(text: string, source: string): CycloneDx {
@@ -77,8 +81,16 @@ export function parseCycloneDx(text: string, source: string): CycloneDx {
   return doc as CycloneDx;
 }
 
-export function s3Key(meta: Pick<StampMeta, "product" | "component" | "version" | "digest">) {
-  return `${meta.product}/${meta.component}/${meta.version}/sha256-${meta.digest.slice(7)}`;
+/**
+ * Per-component SBOMs are keyed by digest, so a rebuild of the same version
+ * never overwrites an earlier one. A release index lives under _releases so one
+ * GET answers "everything in release X" without knowing the component names.
+ */
+export function s3Key(
+  meta: Pick<StampMeta, "product" | "component" | "version" | "digest" | "kind">,
+) {
+  if (meta.kind === "release") return `${meta.product}/_releases/${meta.version}`;
+  return `${meta.product}/${meta.component}/${meta.version}/sha256-${(meta.digest ?? "").slice(7)}`;
 }
 
 export interface Stats {
@@ -105,10 +117,14 @@ export function traceProperties(meta: StampMeta): Property[] {
     { name: "markupai:component", value: meta.component },
     { name: "markupai:version", value: meta.version },
     { name: "markupai:commit", value: meta.commit },
-    {
-      name: meta.subject === "image" ? "markupai:image-digest" : "markupai:sha256",
-      value: meta.digest,
-    },
+    ...(meta.digest
+      ? [
+          {
+            name: meta.subject === "image" ? "markupai:image-digest" : "markupai:sha256",
+            value: meta.digest,
+          },
+        ]
+      : []),
     { name: "markupai:sbom-kind", value: meta.kind },
     { name: "markupai:s3-key", value: s3Key(meta) },
     { name: "markupai:ci-run", value: meta.runUrl },
