@@ -6,7 +6,7 @@ import typescript from "@rollup/plugin-typescript";
 
 const config = {
   // One entry per node action; each action.yml points at dist/<name>/index.js.
-  input: { "stamp/index": "src/stamp/index.ts" },
+  input: { "stamp/index": "src/stamp/index.ts", "pnpm/index": "src/pnpm/index.ts" },
   output: {
     esModule: true,
     dir: "dist",

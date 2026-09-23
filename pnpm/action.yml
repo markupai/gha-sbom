@@ -1,0 +1,26 @@
+name: gha-sbom pnpm
+description: >
+  CycloneDX SBOM for a package in a pnpm workspace, including the
+  dependencies of the workspace packages it links to, which `pnpm sbom`
+  on its own leaves out.
+inputs:
+  workspace:
+    description: Path to the pnpm workspace root.
+    required: true
+  package:
+    description: Workspace-relative path of the package to describe, e.g. console.
+    required: true
+  spec-version:
+    description: CycloneDX spec version to emit.
+    default: "1.6"
+  output:
+    description: Where to write the merged SBOM. Defaults to a path under RUNNER_TEMP.
+    default: ""
+outputs:
+  sbom:
+    description: Path to the merged CycloneDX file.
+  components:
+    description: Number of components after merging.
+runs:
+  using: node24
+  main: ../dist/pnpm/index.js
