@@ -126,6 +126,8 @@ per-component BOMs (`cyclonedx merge --hierarchical`), then stamp with
 - `min-components` fails the step. Generators can succeed with an empty or partial
   BOM (the Maven plugin does without GitHub Packages auth).
 - `min-licence-pct` warns. Lockfile-only generators carry no licence data.
+- A failed `snyk container monitor` warns rather than fails. It runs last, after the
+  SBOM is attested and in S3.
 - Deprecated SPDX licence ids (e.g. `GPL-2.0-with-classpath-exception`) are rewritten
   so the SPDX copy passes strict validation.
 
