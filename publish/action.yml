@@ -2,7 +2,7 @@ name: gha-sbom publish
 description: >
   Attests a stamped CycloneDX SBOM against the image digest or artefact,
   copies both formats to S3, and optionally attaches them to a GitHub Release
-  and registers the image with Snyk.
+  and registers the image with Snyk (a Snyk failure only warns).
 inputs:
   cdx:
     description: Stamped CycloneDX file (stamp output `cdx`).
@@ -139,4 +139,9 @@ runs:
         TAGS: ${{ inputs.snyk-tags }}
         REGISTRY_USER: ${{ github.actor }}
         REGISTRY_PASSWORD: ${{ inputs.github-token }}
-      run: snyk container monitor "$IMAGE" --username="$REGISTRY_USER" --password="$REGISTRY_PASSWORD" ${TAGS:+--project-tags="$TAGS"}
+      # Non-fatal: by now the SBOM is attested and archived, so a Snyk outage
+      # shouldn't fail the release. SLS v0.29.0 lost a leg to SNYK-CLI-0000.
+      run: |
+        if ! snyk container monitor "$IMAGE" --username="$REGISTRY_USER" --password="$REGISTRY_PASSWORD" ${TAGS:+--project-tags="$TAGS"}; then
+          echo "::warning::snyk container monitor failed for $IMAGE; the SBOM is still attested and archived"
+        fi
