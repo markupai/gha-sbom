@@ -133,8 +133,9 @@ per-component BOMs (`cyclonedx merge --hierarchical`), then stamp with
 
 ## Access
 
-Internal repo, Actions access set to the markupai organisation. Public repos can't
-use internal actions, so vscode-extension-sidebar carries a vendored copy.
+Public, so public repos such as vscode-extension-sidebar can use the actions too.
+Nothing here is secret: the bucket and role come from org variables at the call
+site, and only the role's trust policy decides who can write.
 
 ## Development
 

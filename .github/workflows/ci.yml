@@ -13,11 +13,11 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# Self-hosted runners (markupai-runners group) wherever possible. Windows has
-# no self-hosted runner, so that self-test leg stays on GitHub-hosted.
+# Public repo, so GitHub-hosted runners only: a pull request from a fork must
+# never run on the self-hosted ones. Callers exercise the actions on those.
 jobs:
   check:
-    runs-on: markupai-dev-us1-arm64
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -39,25 +39,24 @@ jobs:
           fi
 
   actionlint:
-    runs-on: markupai-dev-us1-arm64
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # The runner image has no Go toolchain.
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: stable
           cache: false
       - run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
 
-  # Runs the actions from this checkout the way callers use them, on both
-  # self-hosted architectures (syft download differs) and on Windows because
-  # the .NET release jobs run there.
+  # Runs the actions from this checkout the way callers use them, on both Linux
+  # architectures (syft download differs) and on Windows because the .NET
+  # release jobs run there.
   self-test:
     needs: check
     strategy:
       fail-fast: false
       matrix:
-        runner: [markupai-dev-us1-amd64, markupai-dev-us1-arm64, windows-latest]
+        runner: [ubuntu-latest, ubuntu-24.04-arm, windows-latest]
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -91,10 +90,14 @@ jobs:
           [[ "$KEY" == _selftest/gha-sbom/run-* ]]
 
       # Uploads to the real bucket on main only: the SBOM role trusts main,
-      # tags and environments, not PRs. Objects land under gha-sbom/self-test/
+      # tags and environments, not PRs. Objects land under _selftest/gha-sbom/
       # and stay locked (GOVERNANCE, 10y) like everything else; a few KB a run.
+      # Fork PRs get no id-token, so they stop at the stamp checks above.
       - name: Publish (attest, plus S3 on main)
-        if: matrix.runner == 'markupai-dev-us1-amd64'
+        if: >-
+          matrix.runner == 'ubuntu-latest' &&
+          (github.event_name != 'pull_request' ||
+           github.event.pull_request.head.repo.full_name == github.repository)
         uses: ./publish
         with:
           cdx: ${{ steps.stamp.outputs.cdx }}

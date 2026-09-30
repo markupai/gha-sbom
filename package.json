@@ -7,7 +7,7 @@
     "type": "git",
     "url": "git+https://github.com/markupai/gha-sbom.git"
   },
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "author": "Markup AI",
   "type": "module",
   "scripts": {
