@@ -2,11 +2,18 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { linkClosure, mergeByPurl } from "../src/lib/pnpm.js";
+import { linkClosure, mergeByPurl, workspacePackages } from "../src/lib/pnpm.js";
 import type { CycloneDx } from "../src/lib/cyclonedx.js";
 
-// Mirrors helios-core's frontend-workspace: apps link: into packages/, and
-// those packages link: into each other.
+// Packages depend on each other by name with workspace:*, as helios-core's
+// frontend-workspace does; `legacy` still links by path.
+const packages = new Map([
+  ["@markupai/sidebar", "packages/sidebar"],
+  ["@markupai/design-system", "packages/design-system"],
+  ["@markupai/api-client", "packages/api-client"],
+  ["@markupai/auth", "packages/auth"],
+]);
+
 function workspace(): string {
   const root = mkdtempSync(path.join(tmpdir(), "pnpm-ws-"));
   const write = (dir: string, deps: Record<string, string>) => {
@@ -15,15 +22,20 @@ function workspace(): string {
   };
   write("console", {
     react: "^19.0.0",
-    "@markupai/sidebar": "link:../packages/sidebar",
-    "@markupai/api-client": "link:../packages/api-client",
+    "@markupai/sidebar": "workspace:*",
+    "@markupai/api-client": "workspace:^",
   });
   write("packages/sidebar", {
     "tailwind-merge": "^3.0.0",
-    "@markupai/design-system": "link:../design-system",
+    "@markupai/design-system": "workspace:*",
   });
-  write("packages/design-system", { cmdk: "^1.0.0", "@markupai/api-client": "link:../api-client" });
-  write("packages/api-client", {});
+  write("packages/design-system", { cmdk: "^1.0.0", "@markupai/api-client": "workspace:*" });
+  write("packages/api-client", { "@markupai/auth": "workspace:../auth" });
+  write("packages/auth", {});
+  write("legacy", {
+    "@markupai/sidebar": "link:../packages/sidebar",
+  });
+  write("orphan", { "@markupai/gone": "workspace:*" });
   write("standalone", { lodash: "^4.0.0" });
   return root;
 }
@@ -34,26 +46,61 @@ describe("linkClosure", () => {
     root = workspace();
   });
 
-  it("follows link: deps transitively, entry first", async () => {
-    expect(await linkClosure(root, "console")).toEqual([
+  it("follows workspace: deps by name transitively, entry first", async () => {
+    expect(await linkClosure(root, "console", packages)).toEqual([
       "console",
       "packages/sidebar",
       "packages/design-system",
       "packages/api-client",
+      "packages/auth",
+    ]);
+  });
+
+  it("follows link: deps by path", async () => {
+    expect(await linkClosure(root, "legacy", packages)).toEqual([
+      "legacy",
+      "packages/sidebar",
+      "packages/design-system",
+      "packages/api-client",
+      "packages/auth",
     ]);
   });
 
   it("visits a shared package once", async () => {
-    const closure = await linkClosure(root, "console");
+    const closure = await linkClosure(root, "console", packages);
     expect(closure.filter((p) => p === "packages/api-client")).toHaveLength(1);
   });
 
   it("returns just the package when nothing is linked", async () => {
-    expect(await linkClosure(root, "standalone")).toEqual(["standalone"]);
+    expect(await linkClosure(root, "standalone", packages)).toEqual(["standalone"]);
+  });
+
+  it("refuses a workspace: dep that names no workspace package", async () => {
+    await expect(linkClosure(root, "orphan", packages)).rejects.toThrow(
+      "orphan depends on @markupai/gone (workspace:*), which is not a workspace package",
+    );
   });
 
   it("names the package that can't be read", async () => {
-    await expect(linkClosure(root, "missing")).rejects.toThrow("missing/package.json");
+    await expect(linkClosure(root, "missing", packages)).rejects.toThrow("missing/package.json");
+  });
+});
+
+describe("workspacePackages", () => {
+  it("maps names to workspace-relative directories", () => {
+    const json = JSON.stringify([
+      { name: "frontend-workspace", path: "/ws" },
+      { name: "markupai-chrome-extension", path: "/ws/chrome-extension" },
+      { name: "@markupai/sidebar", path: "/ws/packages/sidebar" },
+      { path: "/ws/unnamed" },
+    ]);
+    expect(workspacePackages(json, "/ws")).toEqual(
+      new Map([
+        ["frontend-workspace", ""],
+        ["markupai-chrome-extension", "chrome-extension"],
+        ["@markupai/sidebar", "packages/sidebar"],
+      ]),
+    );
   });
 });
 

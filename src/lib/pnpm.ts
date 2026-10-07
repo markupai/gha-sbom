@@ -13,9 +13,16 @@ const LINK = /^(link|workspace):/;
  * `pnpm sbom --filter ./pkg` reports the package's own dependencies but not
  * those of the workspace packages it links to, and the `...` filter suffix
  * doesn't change that. So walk the link graph and generate one BOM per
- * package. Returns workspace-relative directories, the entry package first.
+ * package. `packages` maps each workspace package's name to its
+ * workspace-relative directory, for `workspace:` deps that name a package
+ * rather than a path. Returns workspace-relative directories, the entry
+ * package first.
  */
-export async function linkClosure(workspace: string, entry: string): Promise<string[]> {
+export async function linkClosure(
+  workspace: string,
+  entry: string,
+  packages: ReadonlyMap<string, string>,
+): Promise<string[]> {
   const seen = new Set<string>();
 
   const walk = async (dir: string): Promise<void> => {
@@ -32,18 +39,42 @@ export async function linkClosure(workspace: string, entry: string): Promise<str
       throw new Error(`cannot read ${normalised}/package.json`, { cause: e });
     }
 
-    for (const spec of Object.values(manifest.dependencies ?? {})) {
+    for (const [name, spec] of Object.entries(manifest.dependencies ?? {})) {
       if (!LINK.test(spec)) continue;
       const target = spec.replace(LINK, "");
-      // workspace:* points at a package by name, not a path; pnpm resolves
-      // those itself, so only link: targets need walking.
-      if (!target.startsWith(".")) continue;
-      await walk(path.join(normalised, target));
+      if (target.startsWith(".")) {
+        await walk(path.join(normalised, target));
+        continue;
+      }
+      if (!spec.startsWith("workspace:")) continue;
+      // Skipping an unresolved name would silently drop that package's
+      // dependencies from the BOM.
+      const dir = packages.get(name);
+      if (dir === undefined) {
+        throw new Error(
+          `${normalised} depends on ${name} (${spec}), which is not a workspace package`,
+        );
+      }
+      await walk(dir);
     }
   };
 
   await walk(entry);
   return [...seen];
+}
+
+/**
+ * Maps each package in `pnpm -r ls --depth -1 --json` output to its directory
+ * relative to `root`, the workspace root as pnpm resolved it.
+ */
+export function workspacePackages(json: string, root: string): Map<string, string> {
+  const projects = JSON.parse(json) as { name?: string; path: string }[];
+  const packages = new Map<string, string>();
+  for (const project of projects) {
+    if (project.name === undefined) continue;
+    packages.set(project.name, path.relative(root, project.path));
+  }
+  return packages;
 }
 
 /**
