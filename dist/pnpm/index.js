@@ -1,5 +1,5 @@
 import { g as getInput, i as info, s as setOutput, a as setFailed, e as exec, p as parseCycloneDx } from '../cyclonedx-DmbMCbx0.js';
-import { readFile, mkdir, writeFile } from 'node:fs/promises';
+import { readFile, mkdir, writeFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import 'os';
 import 'crypto';
@@ -40,9 +40,12 @@ const LINK = /^(link|workspace):/;
  * `pnpm sbom --filter ./pkg` reports the package's own dependencies but not
  * those of the workspace packages it links to, and the `...` filter suffix
  * doesn't change that. So walk the link graph and generate one BOM per
- * package. Returns workspace-relative directories, the entry package first.
+ * package. `packages` maps each workspace package's name to its
+ * workspace-relative directory, for `workspace:` deps that name a package
+ * rather than a path. Returns workspace-relative directories, the entry
+ * package first.
  */
-async function linkClosure(workspace, entry) {
+async function linkClosure(workspace, entry, packages) {
     const seen = new Set();
     const walk = async (dir) => {
         const normalised = path.normalize(dir);
@@ -56,19 +59,41 @@ async function linkClosure(workspace, entry) {
         catch (e) {
             throw new Error(`cannot read ${normalised}/package.json`, { cause: e });
         }
-        for (const spec of Object.values(manifest.dependencies ?? {})) {
+        for (const [name, spec] of Object.entries(manifest.dependencies ?? {})) {
             if (!LINK.test(spec))
                 continue;
             const target = spec.replace(LINK, "");
-            // workspace:* points at a package by name, not a path; pnpm resolves
-            // those itself, so only link: targets need walking.
-            if (!target.startsWith("."))
+            if (target.startsWith(".")) {
+                await walk(path.join(normalised, target));
                 continue;
-            await walk(path.join(normalised, target));
+            }
+            if (!spec.startsWith("workspace:"))
+                continue;
+            // Skipping an unresolved name would silently drop that package's
+            // dependencies from the BOM.
+            const dir = packages.get(name);
+            if (dir === undefined) {
+                throw new Error(`${normalised} depends on ${name} (${spec}), which is not a workspace package`);
+            }
+            await walk(dir);
         }
     };
     await walk(entry);
     return [...seen];
+}
+/**
+ * Maps each package in `pnpm -r ls --depth -1 --json` output to its directory
+ * relative to `root`, the workspace root as pnpm resolved it.
+ */
+function workspacePackages(json, root) {
+    const projects = JSON.parse(json);
+    const packages = new Map();
+    for (const project of projects) {
+        if (project.name === undefined)
+            continue;
+        packages.set(project.name, path.relative(root, project.path));
+    }
+    return packages;
 }
 /**
  * Merges per-package BOMs into one, keeping the entry package's metadata.
@@ -115,12 +140,22 @@ async function sbomFor(workspace, pkg, specVersion) {
     });
     return parseCycloneDx(stdout, `pnpm sbom ./${pkg}`);
 }
+async function listWorkspace(workspace) {
+    let stdout = "";
+    await exec("pnpm", ["-r", "ls", "--depth", "-1", "--json"], {
+        cwd: workspace,
+        silent: true,
+        listeners: { stdout: (data) => (stdout += data.toString()) },
+    });
+    // pnpm reports real paths, so a symlinked workspace (macOS /tmp) needs resolving too.
+    return workspacePackages(stdout, await realpath(workspace));
+}
 async function run() {
     try {
         const workspace = getInput("workspace", { required: true });
         const pkg = getInput("package", { required: true });
         const specVersion = getInput("spec-version", { required: true });
-        const packages = await linkClosure(workspace, pkg);
+        const packages = await linkClosure(workspace, pkg, await listWorkspace(workspace));
         info(`${pkg}: ${String(packages.length)} workspace package(s): ${packages.join(", ")}`);
         const boms = [];
         for (const each of packages)
