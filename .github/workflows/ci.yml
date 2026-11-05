@@ -17,7 +17,7 @@ concurrency:
 # never run on the self-hosted ones. Callers exercise the actions on those.
 jobs:
   check:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -39,7 +39,7 @@ jobs:
           fi
 
   actionlint:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -56,7 +56,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-latest, ubuntu-24.04-arm, windows-latest]
+        runner: [ubuntu-26.04, ubuntu-26.04-arm, windows-latest]
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -95,7 +95,7 @@ jobs:
       # Fork PRs get no id-token, so they stop at the stamp checks above.
       - name: Publish (attest, plus S3 on main)
         if: >-
-          matrix.runner == 'ubuntu-latest' &&
+          matrix.runner == 'ubuntu-26.04' &&
           (github.event_name != 'pull_request' ||
            github.event.pull_request.head.repo.full_name == github.repository)
         uses: ./publish
