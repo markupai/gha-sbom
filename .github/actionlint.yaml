@@ -1,0 +1,6 @@
+# GitHub-hosted Ubuntu 26.04 is GA, but actionlint v1.7.12 lacks these labels.
+# https://github.com/actions/runner-images/issues/14747
+paths:
+  .github/workflows/ci.yml:
+    ignore:
+      - '^label "ubuntu-26\.04(-arm)?" is unknown\.'

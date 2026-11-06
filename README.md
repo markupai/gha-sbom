@@ -15,6 +15,19 @@ Source SBOMs come from each ecosystem's own tool (cyclonedx-maven-plugin,
 cyclonedx-npm, `pnpm sbom`, `uv export`/cyclonedx-py, dotnet-CycloneDX,
 cyclonedx-gomod) run in the caller's job, then go through `stamp` and `publish`.
 
+## Dependency updates
+
+Renovate is configured in `.github/renovate.json` for GitHub Actions and npm
+dependencies, with SHA-pinned actions, a seven-day action release cooldown and
+grouped npm development-tool updates. npm updates that affect the bundled
+actions also require `npm run package` and committing the resulting `dist/` changes.
+
+The schedule lives in [markupai/renovate](https://github.com/markupai/renovate),
+not this repository. Onboarding requires `gha-sbom` in both its App-token
+repository list and Renovate allowlist, plus repository access for the
+`markupai-renovatebot` GitHub App. Once enabled, pending updates appear in this
+repository's Dependency Dashboard.
+
 ## Usage
 
 Pin by full SHA with the version as a comment; Renovate keeps it current.
