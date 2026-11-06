@@ -57,12 +57,10 @@ runs:
               const { data } = await github.request("GET /repos/{owner}/{repo}/attestations/{subject_digest}", {
                 ...context.repo,
                 subject_digest: digest,
+                predicate_type: "https://cyclonedx.org/bom",
+                headers: { "X-GitHub-Api-Version": "2026-03-10" },
               });
-              skip = (data.attestations ?? []).some((a) => {
-                const payload = a.bundle?.dsseEnvelope?.payload;
-                if (!payload) return false;
-                return JSON.parse(Buffer.from(payload, "base64").toString()).predicateType === "https://cyclonedx.org/bom";
-              });
+              skip = (data.attestations ?? []).length > 0;
             } catch (e) {
               if (e.status !== 404) throw e;
             }
