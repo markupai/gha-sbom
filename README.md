@@ -157,5 +157,26 @@ npm ci
 npm run all
 ```
 
-`dist/` is committed and CI fails if it's stale. Release with a semver tag and move
-the major tag (`v1`).
+`dist/` is committed and CI fails if it's stale.
+
+## Releases
+
+The existing CI workflow publishes a GitHub Release after a push to `main`
+passes checks, actionlint and all three self-test runners. It tags the exact
+validated commit with the next patch version in the v1 line, generates release
+notes since the previous version tag, and moves the floating `v1` tag to it.
+Version tags are never moved. The version comes from Git tags, not the private
+npm package's `version` field; there is no npm publish step.
+
+PR runs and manual workflow dispatches do not release. Re-running a failed main
+push run recovers partial publication without allocating another version. Main
+runs are not cancelled in progress; superseded commits skip publication so the
+newest successful main run releases the accumulated changes. If that run fails,
+no new release is published until CI passes.
+
+Every successful eligible main push gets a patch release, including maintenance
+changes. For an intentional minor release, create the new v1 minor version tag
+on the tested main commit before re-running that push run; automation will use
+that tag and subsequent releases will increment its patch. A breaking v2 release
+requires updating the release-line policy before merging breaking changes.
+SHA-pinned consumers still need a Renovate PR or manual pin update.
