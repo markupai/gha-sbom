@@ -11,7 +11,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Never interrupt a main run while it is publishing a release.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 # Public repo, so GitHub-hosted runners only: a pull request from a fork must
 # never run on the self-hosted ones. Callers exercise the actions on those.
@@ -107,3 +108,70 @@ jobs:
           subject-path: test/fixtures/artefact.bin
           bucket: ${{ github.ref == 'refs/heads/main' && vars.SBOM_BUCKET || '' }}
           role-arn: ${{ github.ref == 'refs/heads/main' && vars.SBOM_ROLE_ARN || '' }}
+
+  release:
+    needs: [check, actionlint, self-test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-26.04-arm
+    permissions:
+      contents: write
+    steps:
+      # No checkout or build with the write token: release the exact tested SHA.
+      - name: Publish patch release and update major tag
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const repo = { ...context.repo, headers: { "X-GitHub-Api-Version": "2026-03-10" } };
+            const { data: main } = await github.rest.git.getRef({ ...repo, ref: "heads/main" });
+            if (main.object.sha !== context.sha) {
+              core.notice("A newer commit is on main; its CI run will release the accumulated changes.");
+              return;
+            }
+
+            const tags = await github.paginate(github.rest.repos.listTags, { ...repo, per_page: 100 });
+            const versions = tags.filter((tag) => /^v1\.\d+\.\d+$/.test(tag.name));
+            versions.sort((a, b) => b.name.localeCompare(a.name, "en", { numeric: true }));
+            const latest = versions[0];
+            if (!latest) throw new Error("No stable v1 tag found; bootstrap the release line manually.");
+            const existing = versions.find((tag) => tag.commit.sha === context.sha);
+            if (existing && existing.name !== latest.name) {
+              throw new Error("Refusing to release a commit with an older version tag.");
+            }
+            const parts = latest.name.slice(1).split(".").map(Number);
+            const tag = existing?.name ?? `v1.${parts[1]}.${parts[2] + 1}`;
+            if (!existing) {
+              await github.rest.git.createRef({ ...repo, ref: `refs/tags/${tag}`, sha: context.sha });
+            }
+
+            let release;
+            try {
+              ({ data: release } = await github.rest.repos.getReleaseByTag({ ...repo, tag }));
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              const previous = versions.find((version) => version.name !== tag);
+              const { data: notes } = await github.rest.repos.generateReleaseNotes({
+                ...repo, tag_name: tag, target_commitish: context.sha,
+                ...(previous ? { previous_tag_name: previous.name } : {}),
+              });
+              ({ data: release } = await github.rest.repos.createRelease({
+                ...repo, tag_name: tag, target_commitish: context.sha,
+                name: tag, body: notes.body, draft: false, prerelease: false, make_latest: "true",
+              }));
+            }
+            if (release.draft || release.prerelease) {
+              throw new Error(`Refusing to promote unpublished or prerelease ${tag}.`);
+            }
+            // Only the floating major tag moves; published version tags never do.
+            try {
+              await github.rest.git.getRef({ ...repo, ref: "tags/v1" });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              await github.rest.git.createRef({ ...repo, ref: "refs/tags/v1", sha: context.sha });
+            }
+            await github.rest.git.updateRef({ ...repo, ref: "tags/v1", sha: context.sha, force: true });
+            const { data: major } = await github.rest.git.getRef({ ...repo, ref: "tags/v1" });
+            const { data: published } = await github.rest.repos.getReleaseByTag({ ...repo, tag });
+            if (major.object.sha !== context.sha || published.draft || published.prerelease) {
+              throw new Error("Release verification failed.");
+            }
+            core.notice(`Released ${tag}: ${published.html_url}`);
